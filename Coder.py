@@ -2,7 +2,7 @@
 Article to Code 
 ===============
 
-Author: Sebastien M. LAIGNEL - Version 4 October 2024
+Author: Sebastien M. LAIGNEL - Version 8 October 2024
 
 Description:
 ------------
@@ -10,7 +10,7 @@ This script processes a PDF article to extract trading strategy and risk managem
 produces QuantConnect Python code for algorithmic trading based on the extracted data. The script utilizes OpenAI's language 
 models for summarization and code generation, and presents the results in a graphical user interface (GUI) built with Tkinter.
 
-LLM used : GPT-4o-latest 
+LLM used : chatgpt-4o-latest for better results
 
 License:
 --------
@@ -234,7 +234,7 @@ class KeywordAnalyzer:
 class OpenAIHandler:
     """Handles interactions with the OpenAI API."""
 
-    def __init__(self, model: str = "gpt-4o"):
+    def __init__(self, model: str = "chatgpt-4o-latest"):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.model = model
 
@@ -252,12 +252,14 @@ class OpenAIHandler:
         - Core Strategy: Describe the primary trading approach, including any specific indicators, time frames (e.g., 5-minute), and entry/exit rules.
         - Stock Selection: Highlight any stock filters (e.g., liquidity, trading volume thresholds, or price conditions) used to choose which stocks to trade.
         - Trade Signals: Explain how the strategy determines whether to go long or short, including any conditions based on candlestick patterns or breakouts.
+
         {trading_signals}
 
         ### Risk Management Rules:
         - Stop Loss: Describe how stop-loss levels are set (e.g., 10% ATR) and explain the position-sizing rules (e.g., 1% of capital at risk per trade).
         - Exit Conditions: Clarify how and when positions are closed (e.g., at the end of the trading day or if certain price targets are hit).
         - Additional Constraints: Mention any leverage limits or other risk controls (e.g., maximum leverage of 4x, focusing on Stocks in Play).
+
         {risk_management}
 
         Summarize the details in a practical and structured format.
@@ -267,10 +269,10 @@ class OpenAIHandler:
             response = openai.ChatCompletion.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are an expert financial analyst."},
+                    {"role": "system", "content": "You are an algorithmic trading expert."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=500,
+                max_tokens=1000,
                 temperature=0.5,
                 n=1
             )
@@ -283,161 +285,34 @@ class OpenAIHandler:
             self.logger.error(f"Unexpected error during summary generation: {e}")
         return None
 
-    def generate_qc_code(self, extracted_data: Dict[str, List[str]]) -> Optional[str]:
+    def generate_qc_code(self, summary: str) -> Optional[str]:
         """
         Generate QuantConnect Python code based on extracted data.
         """
         self.logger.info("Generating QuantConnect code using OpenAI.")
-        trading_signals = '\n'.join(extracted_data.get('trading_signal', []))
-        risk_management = '\n'.join(extracted_data.get('risk_management', []))
+        #trading_signals = '\n'.join(extracted_data.get('trading_signal', []))
+        #risk_management = '\n'.join(extracted_data.get('risk_management', []))
 
         prompt = f"""
-        You are an expert QuantConnect algorithm developer. Convert the following trading strategy and risk management descriptions into a complete, error-free QuantConnect Python algorithm.
+        You are a QuantConnect algorithm developer. Convert the following trading strategy descriptions into a complete, error-free QuantConnect Python algorithm.
 
-        ### Trading Strategy:
-        {trading_signals}
-
-        ### Risk Management:
-        {risk_management}
+        ### Trading Strategy Summary:
+        {summary}
 
         ### Requirements:
         1. **Initialize Method**:
             - Set the start and end dates.
             - Set the initial cash.
-            - Define the universe selection logic.
-            - Initialize required indicators.
+            - Define the universe selection logic as described in trading strategy summary. 
+            - Initialize required indicators as described in summary.
         2. **OnData Method**:
-            - Implement buy/sell logic based on indicators.
+            - Implement buy/sell logic as described in summary. 
             - Ensure indicators are updated correctly.
         3. **Risk Management**:
-            - Implement drawdown limit of 15%.
-            - Apply position sizing or stop-loss mechanisms as described.
+            - Apply position sizing or stop-loss mechanisms as described in summary. 
         4. **Ensure Compliance**:
             - Use only QuantConnect's supported indicators and methods.
             - The code must be syntactically correct and free of errors.
-
-        ### Example of an algorithm to showcase the program structure:
-        ```python
-        from AlgorithmImports import *
-
-        class PennyStocksAlgorithm(QCAlgorithm):
-            def Initialize(self):
-                self.SetStartDate(2024, 1, 1)   # Set Start Date
-                self.SetCash(11_700)            # Set Strategy Cash
-
-                self.SetSecurityInitializer(BrokerageModelSecurityInitializer(
-                    self.BrokerageModel, FuncSecuritySeeder(self.GetLastKnownPrices)
-                ))
-                #self.set_benchmark('SPY')    
-                self.UniverseSettings.Resolution = Resolution.Daily
-
-                self.momentum_indicators = []    # List of Momentum indicators keyed by Symbol
-                self.lookback_period = 252       # Momentum indicator lookback period
-                self.num_coarse = 500            # Number of symbols selected at Coarse Selection
-                self.num_fine = 20               # Number of symbols selected at Fine Selection
-                self.num_long = 10               # Number of symbols with open positions
-
-                self.current_month = -1
-                self.rebalance_flag = True
-                # Define your list of specific tickers
-                tickers = ["POWL", "WF", "GRBK", "MHO", "APP","ET",'BRKB']
-
-                # Add the tickers to the manual universe
-                self.AddUniverseSelection(ManualUniverseSelectionModel(tickers))
-                self.AddUniverse(self.CoarseSelectionFunction, self.FineSelectionFunction)
-
-            def CoarseSelectionFunction(self, coarse):
-                '''Drop securities which have no fundamental data'''
-
-                if self.current_month == self.Time.month:
-                    return Universe.Unchanged
-
-                self.rebalance_flag = True
-                self.current_month = self.Time.month
-
-                # Filter and sort in a single step
-                selected = sorted(
-                    [x for x in coarse if x.HasFundamentalData and x.Price > 1 and 5e9 < x.MarketCap < 10e9],
-                    key=lambda x: x.DollarVolume, 
-                    reverse=True
-                )
-
-                return [x.Symbol for x in selected[:self.num_coarse]]
-
-            def FineSelectionFunction(self, fine):
-                '''Select securities with highest market cap'''
-                selected = sorted(fine, key=lambda f: f.MarketCap, reverse=True)
-                return [x.Symbol for x in selected[:self.num_fine]]
-
-            def OnData(self, data):
-                # Update the indicators
-                for symbol, momentum in self.momentum_indicators.items():
-                    if symbol in data and data[symbol] is not None:
-                        momentum.Update(self.Time, data[symbol].Close)
-
-                if not self.rebalance_flag:
-                    return
-
-                # Select securities with highest momentum
-                sorted_momentum = sorted(
-                    [k for k, v in self.momentum_indicators.items() if v.IsReady],
-                    key=lambda x: self.momentum_indicators[x].Current.Value, 
-                    reverse=True
-                )
-                selected = sorted_momentum[:self.num_long]
-
-                # Liquidate securities that are not in the selected list
-                for symbol in list(self.Portfolio.Keys):
-                    if symbol not in selected:
-                        self.Liquidate(symbol, 'Not selected')
-
-                # Buy selected securities with pyramiding logic
-                initial_investment = 1000
-                additional_investment = 500
-
-                for symbol in selected:
-                    if symbol in data and data[symbol] is not None:  # Check if data for the symbol is available
-                        current_investment = self.Portfolio[symbol].Invested
-                        if current_investment:
-                            # If already invested, add additional investment
-                            self.MarketOrder(symbol, additional_investment / data[symbol].Close)
-                        else:
-                            # Initial investment
-                            self.MarketOrder(symbol, initial_investment / data[symbol].Close)
-
-                            # Uncomment these lines if you want to set take profit and stop loss orders
-                            # take_profit_price = data[symbol].Close * 1.01
-                            # stop_loss_price = data[symbol].Close * 0.98
-                            # self.LimitOrder(symbol, -self.Portfolio[symbol].Quantity, take_profit_price)
-                            # self.StopMarketOrder(symbol, -self.Portfolio[symbol].Quantity, stop_loss_price)
-
-                self.rebalance_flag = False
-
-            def OnSecuritiesChanged(self, changes):
-                # Clean up data for removed securities and Liquidate
-                for security in changes.RemovedSecurities:
-                    symbol = security.Symbol
-                    if symbol in self.momentum_indicators:
-                        self.momentum_indicators.pop(symbol)
-                        self.Liquidate(symbol, 'Removed from universe')
-
-                for security in changes.AddedSecurities:
-                    if security.Symbol not in self.momentum_indicators:
-                        self.momentum_indicators[security.Symbol] = MomentumPercent(self.lookback_period)
-
-                # Warm up the indicator with historical prices if it is not ready
-                added_symbols = [k for k, v in self.momentum_indicators.items() if not v.IsReady]
-
-                if added_symbols:
-                    history = self.History(added_symbols, 1 + self.lookback_period, Resolution.Daily)
-                    
-                    for symbol in added_symbols:
-                        ticker = symbol.ID.ToString()
-                        if ticker in history.index.levels[0]:
-                            symbol_history = history.loc[ticker]
-                            for time, value in symbol_history['close'].dropna().items():
-                                item = IndicatorDataPoint(symbol, time, value)
-                                self.momentum_indicators[symbol].Update(item)
         ```
 
         ### Generated Code:
@@ -476,7 +351,7 @@ class OpenAIHandler:
         """
         self.logger.info("Refining generated code using OpenAI.")
         prompt = f"""
-        The following QuantConnect Python code has syntax errors. Please fix them and provide the corrected code.
+        The following QuantConnect Python code may have syntax or logical errors. Please fix them as required and provide the corrected code.
 
         ```python
         {code}
@@ -715,14 +590,14 @@ class GUI:
 class ArticleProcessor:
     """Main processor that orchestrates the PDF processing, analysis, and code generation."""
 
-    def __init__(self, max_refine_attempts: int = 2):
+    def __init__(self, max_refine_attempts: int = 4):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.pdf_loader = PDFLoader()
         self.preprocessor = TextPreprocessor()
         self.heading_detector = HeadingDetector()
         self.section_splitter = SectionSplitter()
         self.keyword_analyzer = KeywordAnalyzer()
-        self.openai_handler = OpenAIHandler(model="gpt-4o")  # Specify the model here
+        self.openai_handler = OpenAIHandler(model="chatgpt-4o-latest")  # Specify the model here
         self.code_validator = CodeValidator()
         self.code_refiner = CodeRefiner(self.openai_handler)
         self.gui = GUI()
@@ -761,15 +636,15 @@ class ArticleProcessor:
         if not extracted_data:
             self.logger.error("No data extracted for code generation.")
             return
-        
+
         # Generate summary
         summary = self.openai_handler.generate_summary(extracted_data)
         if not summary:
             self.logger.error("Failed to generate summary.")
             summary = "Summary could not be generated."
-        
+
         # Generate QuantConnect code with refinement attempts
-        qc_code = self.openai_handler.generate_qc_code(extracted_data)
+        qc_code = self.openai_handler.generate_qc_code(summary)  # Pass summary here
         attempt = 0
         while qc_code and not self.code_validator.validate_code(qc_code) and attempt < self.max_refine_attempts:
             self.logger.info(f"Attempt {attempt + 1} to refine code.")
@@ -786,7 +661,7 @@ class ArticleProcessor:
 
         # Display summary and code in the GUI
         self.gui.display_summary_and_code(summary, qc_code)
-        
+
         if qc_code != "QuantConnect code could not be generated successfully.":
             self.logger.info("QuantConnect code generation and display completed successfully.")
         else:
