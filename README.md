@@ -1,6 +1,6 @@
 # 🛠️ Algorithms Generation from Quantitative Finance Articles to QuantConnect  🚀 
 
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
+[![License](https://img.shields.io/badge/License-CC--BY--NC--4.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/Python-3.8%2B-blue.svg)
 ![OpenAI](https://img.shields.io/badge/OpenAI-GPT4-brightgreen.svg)
 
