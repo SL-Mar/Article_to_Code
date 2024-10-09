@@ -31,7 +31,7 @@ This script streamlines the transformation of quantitative finance research into
 
 The project is currently in development and will undergo further refinement. While most corrections can be handled by MIA, the built-in QuantConnect AI, or through manual debugging, it is essential that trading logic be manually reviewed to ensure the algorithm behaves as intended. The author assumes no responsibility for any losses incurred from the use of this software. Trading carries inherent risks and requires a high level of expertise.
 
-A successful performance test is defined by the absence of compilation errors and the execution of at least one trade. As of Tuesday, October 8th, the success rate stands at 73% across 11 tests.
+A successful performance test is defined by the absence of compilation errors and the execution of at least one trade. As of Tuesday, October 8th, the success rate stands at 75% across 12 tests.
 
 ## Features
 
